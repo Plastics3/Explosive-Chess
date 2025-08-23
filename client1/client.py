@@ -4,8 +4,7 @@ import socket
 import threading
 import queue
 
-Player_number = 1
-Player = f"Player {Player_number}"
+
 
 HOST = "127.0.0.1"  
 PORT = 65432
@@ -99,10 +98,13 @@ while(start == False):
         msg = messages.get()
         if msg == "start":
             start = True
+        elif msg.startswith("num"):
+            Player_number = int(msg[3:])
+            print(f"Assigned as Player {Player_number}")
+            Player = f"Player {Player_number}"
 
     pygame.display.flip()
     clock.tick(120)
-
 
 #layout
 Run = True

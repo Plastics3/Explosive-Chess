@@ -1,5 +1,6 @@
 import socket
 import threading
+import random
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -54,6 +55,10 @@ def accept_clients(server_socket):
                 try:
                     client1.sendall(b"start\n")
                     client2.sendall(b"start\n")
+                    num = random.randint(1, 2)
+                    client1.sendall(f"num{num}\n".encode())
+                    client2.sendall(f"num{3 - num}\n".encode())
+
                 except OSError:
                     pass
                 threading.Thread(target=handle_pair, args=(client1, client2), daemon=True).start()
