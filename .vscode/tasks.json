@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Server",
+			"type": "shell",
+			"command": "python server/server.py",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Client 1",
+			"type": "shell",
+			"command": "python client1/client.py",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Client 2",
+			"type": "shell",
+			"command": "python client2/client.py",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
