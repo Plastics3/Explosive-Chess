@@ -4,8 +4,6 @@ import socket
 import threading
 import queue
 
-
-
 HOST = "127.0.0.1"  
 PORT = 65432
     
@@ -183,8 +181,19 @@ def Board(surf):
                 surf.blit(piece_images[piece], (col*Square_Size, row*Square_Size))
 
 #getting the coords
+def StripStringFromMove(msg: str):
+    # Expect: Move({fr_row},{fr_col})|({to_row},{to_col})
+    nums = re.findall(r"-?\d+", msg)
+    if len(nums) != 4:
+        print("Bad Move message:", msg)
+        return None, None
+    fr = (int(nums[0]), int(nums[1]))
+    to = (int(nums[2]), int(nums[3]))
+    return fr, to
+
 def String_with_letters_to_tuple(msg: str):
-    nums = re.findall(r"\d+", msg)
+    # legacy small helper used for selected/to parsing on client
+    nums = re.findall(r"-?\d+", msg)
     if len(nums) != 2:
         print("Bad message:", msg)
         return None
@@ -237,29 +246,23 @@ while Run:
 #reciving
     while not messages.empty():
         msg = messages.get()
-
-        if msg.startswith("selected"):
-            coords = String_with_letters_to_tuple(msg)
-            if coords:
-                remote_selected = coords
-                print("Partner selected", coords)
-
-        elif msg.startswith("to"):
-            to_coords = String_with_letters_to_tuple(msg)
-            if to_coords and remote_selected is not None:
-                fr = remote_selected
-                tr = to_coords
-                if Player_number == 2:
-                    piece = board[7-fr[0]][fr[1]]
-                    board[7-fr[0]][fr[1]] = " "
-                    board[7-to_coords[0]][to_coords[1]] = piece
-                else:
-                    piece = board[fr[0]][fr[1]]
-                    board[fr[0]][fr[1]] = " "
-                    board[to_coords[0]][to_coords[1]] = piece
-                remote_selected = None
-                Turn = True  
-                print("Partner moved to", tr)
+        print("Received message:", msg)
+        if msg.startswith("Move"):
+            fr_coords, to_coords = StripStringFromMove(msg)
+            fr = fr_coords
+            tr = to_coords
+            if Player_number == 2:
+                piece = board[7-fr[0]][fr[1]]
+                board[7-fr[0]][fr[1]] = " "
+                board[7-to_coords[0]][to_coords[1]] = piece
+            else:
+                piece = board[fr[0]][fr[1]]
+                board[fr[0]][fr[1]] = " "
+                board[to_coords[0]][to_coords[1]] = piece
+            fr, tr = None, None
+            if Turn == False: Turn = True
+            else: Turn = False
+            print("Partner moved to", tr)
         
 
     
