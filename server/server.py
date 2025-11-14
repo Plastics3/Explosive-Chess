@@ -21,13 +21,13 @@ def IsValidMove(selected, to, board, turn):
     endPiece = board[to_row][to_col]
 
     if piece == " ":
-        return False
+        return False , board
     
     if piece[0] == endPiece[0]:
-        return False
+        return False , board
 
-    if (piece[0] == "B" and turn != 2) or (piece[0] == "W" and turn != 1):
-        return False
+    """if (piece[0] == "B" and turn != 2) or (piece[0] == "W" and turn != 1):
+        return False"""
     
     if piece[1] == "P":  #pawn movement
         direction = -1 if piece[0] == "W" else 1
@@ -35,48 +35,48 @@ def IsValidMove(selected, to, board, turn):
 
         if sel_col == to_col:
             if endPiece != " ":
-                return False
+                return False , board
             if to_row - sel_row == direction:
-                return True
+                return True , board
             if sel_row == start_row and to_row - sel_row == 2 * direction:
                 between_row = sel_row + direction
                 if board[between_row][sel_col] == " " and endPiece == " ":
-                    return True
-        """elif abs(sel_col - to_col) == 1 and to_row - sel_row == direction:
+                    return True , board
+        elif abs(sel_col - to_col) == 1 and to_row - sel_row == direction:
             if endPiece != " ":
-                return True""" # enpassant not implemented yet
-        return False
+                return True , board
+        return False , board
     
     if piece[1] == "R":  #rook movement
         if sel_row != to_row and sel_col != to_col:
-            return False
+            return False , board
         step_row = 0 if sel_row == to_row else (1 if to_row > sel_row else -1)
         step_col = 0 if sel_col == to_col else (1 if to_col > sel_col else -1)
         curr_row, curr_col = sel_row + step_row, sel_col + step_col
         while (curr_row != to_row or curr_col != to_col):
             if board[curr_row][curr_col] != " ":
-                return False
+                return False , board
             curr_row += step_row
             curr_col += step_col
-        return True
+        return True , board
     
     if piece[1] == "K":  #king movement
         if abs(sel_row - to_row) <= 1 and abs(sel_col - to_col) <= 1:
-            return True
-        return False
+            return True , board
+        return False , board
     
     if piece[1] == "B":  #bishop movement
         if abs(sel_row - to_row) != abs(sel_col - to_col):
-            return False
+            return False , board
         step_row = 1 if to_row > sel_row else -1
         step_col = 1 if to_col > sel_col else -1
         curr_row, curr_col = sel_row + step_row, sel_col + step_col
         while (curr_row != to_row and curr_col != to_col):
             if board[curr_row][curr_col] != " ":
-                return False
+                return False , board
             curr_row += step_row
             curr_col += step_col
-        return True
+        return True , board
     
     if piece[1] == "Q":  #queen movement
         if sel_row == to_row or sel_col == to_col:
@@ -86,22 +86,22 @@ def IsValidMove(selected, to, board, turn):
             step_row = 1 if to_row > sel_row else -1
             step_col = 1 if to_col > sel_col else -1
         else:
-            return False
+            return False , board
         curr_row, curr_col = sel_row + step_row, sel_col + step_col
         while (curr_row != to_row or curr_col != to_col):
             if board[curr_row][curr_col] != " ":
-                return False
+                return False , board
             curr_row += step_row
             curr_col += step_col
-        return True
+        return True , board
     
     if piece[1] == "N":  #knight movement
         if (abs(sel_row - to_row) == 2 and abs(sel_col - to_col) == 1) or (abs(sel_row - to_row) == 1 and abs(sel_col - to_col) == 2):
-            return True
-        return False
+            return True , board
+        return False , board
     
     
-    return True
+    return True , board
     
 
 
@@ -118,7 +118,9 @@ def SendMassageToClients(clients, selected, to):
 def handle_pair(client1, client2):
     """Forward every message from one client to both clients (echo)."""
     clients = [client1, client2]
-    board =       [["BR","BN","BB","BQ","BK","BB","BN","BR"],
+
+    def forward(src, dsts):
+        board =       [["BR","BN","BB","BQ","BK","BB","BN","BR"],
                       ["BP","BP","BP","BP","BP","BP","BP","BP"],
                       [" "," "," "," "," "," "," "," "],
                       [" "," "," "," "," "," "," "," "],
@@ -126,9 +128,6 @@ def handle_pair(client1, client2):
                       [" "," "," "," "," "," "," "," "],
                       ["WP","WP","WP","WP","WP","WP","WP","WP"],
                       ["WR","WN","WB","WQ","WK","WB","WN","WR"]]
-    
-
-    def forward(src, dsts):
         selected = None
         to = None
         turn = 1        # #1 for white, #2 for black
@@ -140,12 +139,18 @@ def handle_pair(client1, client2):
                 # Echo to ALL clients (including sender)
                 if data.decode().startswith("selected"):
                     selected = data.decode() #get selected coordinate
+                    to = None
 
                 elif data.decode().startswith("to"):
                     to = data.decode() #Get to coordinates and then send it 
-                    if IsValidMove(selected, to, board, turn):
+                    Legal, tempBoard = IsValidMove(selected, to, board, turn)
+
+                    if Legal:
                         SendMassageToClients(clients, selected, to)
+                        board = tempBoard
                         turn = 3 - turn  #switch turn
+                        selected = None
+                        to = None
 
                     else:
                         selected = None
