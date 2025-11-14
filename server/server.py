@@ -8,9 +8,105 @@ PORT = 65432
 waiting_client = None
 lock = threading.Lock()
 
-def SendMassageToClients(clients, selected, to):
+def StripSelectedAndTo(selected, to):
     Strip_Selected = selected[8:]  #removing "selected:"
     Strip_To = to[2:]              #removing "to:"
+    return Strip_Selected, Strip_To
+
+def IsValidMove(selected, to, board, turn):
+    selected, to = StripSelectedAndTo(selected, to)
+    sel_row, sel_col = int(selected[0]), int(selected[2])
+    to_row, to_col = int(to[0]), int(to[2])
+    piece = board[sel_row][sel_col]
+    endPiece = board[to_row][to_col]
+
+    if piece == " ":
+        return False
+    
+    if piece[0] == endPiece[0]:
+        return False
+
+    if (piece[0] == "B" and turn != 2) or (piece[0] == "W" and turn != 1):
+        return False
+    
+    if piece[1] == "P":  #pawn movement
+        direction = -1 if piece[0] == "W" else 1
+        start_row = 6 if piece[0] == "W" else 1
+
+        if sel_col == to_col:
+            if endPiece != " ":
+                return False
+            if to_row - sel_row == direction:
+                return True
+            if sel_row == start_row and to_row - sel_row == 2 * direction:
+                between_row = sel_row + direction
+                if board[between_row][sel_col] == " " and endPiece == " ":
+                    return True
+        """elif abs(sel_col - to_col) == 1 and to_row - sel_row == direction:
+            if endPiece != " ":
+                return True""" # enpassant not implemented yet
+        return False
+    
+    if piece[1] == "R":  #rook movement
+        if sel_row != to_row and sel_col != to_col:
+            return False
+        step_row = 0 if sel_row == to_row else (1 if to_row > sel_row else -1)
+        step_col = 0 if sel_col == to_col else (1 if to_col > sel_col else -1)
+        curr_row, curr_col = sel_row + step_row, sel_col + step_col
+        while (curr_row != to_row or curr_col != to_col):
+            if board[curr_row][curr_col] != " ":
+                return False
+            curr_row += step_row
+            curr_col += step_col
+        return True
+    
+    if piece[1] == "K":  #king movement
+        if abs(sel_row - to_row) <= 1 and abs(sel_col - to_col) <= 1:
+            return True
+        return False
+    
+    if piece[1] == "B":  #bishop movement
+        if abs(sel_row - to_row) != abs(sel_col - to_col):
+            return False
+        step_row = 1 if to_row > sel_row else -1
+        step_col = 1 if to_col > sel_col else -1
+        curr_row, curr_col = sel_row + step_row, sel_col + step_col
+        while (curr_row != to_row and curr_col != to_col):
+            if board[curr_row][curr_col] != " ":
+                return False
+            curr_row += step_row
+            curr_col += step_col
+        return True
+    
+    if piece[1] == "Q":  #queen movement
+        if sel_row == to_row or sel_col == to_col:
+            step_row = 0 if sel_row == to_row else (1 if to_row > sel_row else -1)
+            step_col = 0 if sel_col == to_col else (1 if to_col > sel_col else -1)
+        elif abs(sel_row - to_row) == abs(sel_col - to_col):
+            step_row = 1 if to_row > sel_row else -1
+            step_col = 1 if to_col > sel_col else -1
+        else:
+            return False
+        curr_row, curr_col = sel_row + step_row, sel_col + step_col
+        while (curr_row != to_row or curr_col != to_col):
+            if board[curr_row][curr_col] != " ":
+                return False
+            curr_row += step_row
+            curr_col += step_col
+        return True
+    
+    if piece[1] == "N":  #knight movement
+        if (abs(sel_row - to_row) == 2 and abs(sel_col - to_col) == 1) or (abs(sel_row - to_row) == 1 and abs(sel_col - to_col) == 2):
+            return True
+        return False
+    
+    
+    return True
+    
+
+
+def SendMassageToClients(clients, selected, to):
+    Strip_Selected, Strip_To = StripSelectedAndTo(selected, to)
     message = f"move:{Strip_Selected}|{Strip_To}\n"
     print(message)
     for client in clients:
@@ -22,19 +118,20 @@ def SendMassageToClients(clients, selected, to):
 def handle_pair(client1, client2):
     """Forward every message from one client to both clients (echo)."""
     clients = [client1, client2]
-    board =       [["WR","WN","WB","WQ","WK","WB","WN","WR"],
-                      ["WP","WP","WP","WP","WP","WP","WP","WP"],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
+    board =       [["BR","BN","BB","BQ","BK","BB","BN","BR"],
                       ["BP","BP","BP","BP","BP","BP","BP","BP"],
-                      ["BR","BN","BB","BQ","BK","BB","BN","BR"]]
+                      [" "," "," "," "," "," "," "," "],
+                      [" "," "," "," "," "," "," "," "],
+                      [" "," "," "," "," "," "," "," "],
+                      [" "," "," "," "," "," "," "," "],
+                      ["WP","WP","WP","WP","WP","WP","WP","WP"],
+                      ["WR","WN","WB","WQ","WK","WB","WN","WR"]]
     
 
     def forward(src, dsts):
         selected = None
         to = None
+        turn = 1        # #1 for white, #2 for black
         try:
             while True:
                 data = src.recv(1024)
@@ -46,7 +143,14 @@ def handle_pair(client1, client2):
 
                 elif data.decode().startswith("to"):
                     to = data.decode() #Get to coordinates and then send it 
-                    SendMassageToClients(clients, selected, to)
+                    if IsValidMove(selected, to, board, turn):
+                        SendMassageToClients(clients, selected, to)
+                        turn = 3 - turn  #switch turn
+
+                    else:
+                        selected = None
+                        to = None
+
 
         except (ConnectionResetError, OSError):
             pass #catch disconnection

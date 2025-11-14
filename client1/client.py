@@ -188,7 +188,7 @@ def Board(surf):
                 surf.blit(piece_images[piece], (col*Square_Size, row*Square_Size))
 
 def StripStringFromMove(msg: str):
-                                            # Expect: "Move:(row,col)|(row,col)"
+                                            # Expect: "move:row,col|row,col"
     move = msg[5:]                          # remove the "move:" part
     parts = move.split("|") 
     return parts[0], parts[1]
@@ -258,7 +258,7 @@ while Run:
         msg = messages.get()
         print("Received message:", msg)
         print("p2")
-        if msg.startswith("move:"):         # removing "Move:" and splitting to select and to
+        if msg.startswith("move:"):         # removing "move:" and splitting to select and to
             print(msg)
             selected_coords_String, to_coords_String = StripStringFromMove(msg)
             print(selected_coords_String)
