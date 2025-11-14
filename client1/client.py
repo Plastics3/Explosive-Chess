@@ -10,30 +10,36 @@ PORT = 65432
 lock = threading.Lock()
 messages = queue.Queue()
 start = False
-#messages
+
+                                            # messages
 def listen_for_messages(sock):
     buffer = ""
+
     while True:
         try:
             data = sock.recv(1024)
-            if not data:
+            if not data:                        
                 print("Disconnected from server")
                 break
+
             buffer += data.decode()
+
             while "\n" in buffer:
                 msg, buffer = buffer.split("\n", 1)
                 messages.put(msg)
+
         except:
             break
 
+                                            # connecting to server
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
 print("Connected to server, waiting for partner...")
 
-# Start listener thread
+                                            # Start listener thread
 threading.Thread(target=listen_for_messages, args=(s,), daemon=True).start()
 
-#colors
+                                            # colors
 LIGHT = (240, 217, 181)
 DARK  = (181, 136, 99)
 BG_TOP = (30, 30, 60)
@@ -41,7 +47,7 @@ BG_BOTTOM = (10, 10, 30)
 TEXT_COLOR = (255, 255, 255)
 CIRCLE_COLOR = (100, 200, 255)
 
-#waiting screen
+                                            # waiting screen
 pygame.init()
 
 Square_Size = 160
@@ -52,9 +58,9 @@ font = pygame.font.SysFont("Arial", 48, bold=True)
 small_font = pygame.font.SysFont("Arial", 32)
 clock = pygame.time.Clock()
 start_time = time.time()
-#waiting screen look
+                                            # waiting screen look
 def draw_gradient_background():
-    # vertical gradient
+                                            # vertical gradient
     for y in range(HEIGHT):
         ratio = y / HEIGHT
         r = BG_TOP[0] * (1 - ratio) + BG_BOTTOM[0] * ratio
@@ -63,7 +69,7 @@ def draw_gradient_background():
         pygame.draw.line(screen, (int(r), int(g), int(b)), (0, y), (WIDTH, y))
 
 def draw_loading_circles(elapsed):
-    # Animate circles in a circular orbit
+                                            # Animate circles in a circular orbit
     num_circles = 8
     radius = 100
     center_x, center_y = WIDTH // 2, HEIGHT // 2 + 50
@@ -74,19 +80,19 @@ def draw_loading_circles(elapsed):
         y = int(center_y + radius * math.sin(angle))
         pygame.draw.circle(screen, CIRCLE_COLOR, (x, y - 100), 15)
 
-#waiting to start
+                                            # waiting to start
 while(start == False):
-    elapsed = time.time() - start_time
+    elapsed = time.time() - start_time      # draw waiting screen
     draw_gradient_background()
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT:       # quit event
             pygame.quit
             quit()
-    text_surface = font.render("Waiting for Partner...", True, TEXT_COLOR)
-    text_rect = text_surface.get_rect(center=(WIDTH//2, HEIGHT//2 - 300))
+    text_surface = font.render("Waiting for Partner...", True, TEXT_COLOR) # render text
+    text_rect = text_surface.get_rect(center=(WIDTH//2, HEIGHT//2 - 300))  # get text rect
     screen.blit(text_surface, text_rect)
 
-    draw_loading_circles(elapsed)
+    draw_loading_circles(elapsed)           # draw loading circles
 
     hint_surface = small_font.render("Please wait...", True, TEXT_COLOR)
     hint_rect = hint_surface.get_rect(center=(WIDTH//2, HEIGHT//2 + 150))
@@ -104,23 +110,24 @@ while(start == False):
     pygame.display.flip()
     clock.tick(120)
 
-#layout
+                                            # layout
 Run = True
 selected = None
 
 piece_images = {}
 piece_names = ["P", "R", "N", "B", "Q", "K"]
-for name in piece_names:
+
+for name in piece_names:                    # mapping piece names to images
     piece_images["W"+name] = pygame.image.load(os.path.join("pieces", f"W{name}.png"))
     piece_images["B"+name] = pygame.image.load(os.path.join("pieces", f"B{name}.png"))
 
 
-# Scale images to tile size
+                                            # Scale images to tile size
 for key in piece_images:
     piece_images[key] = pygame.transform.smoothscale(piece_images[key], (Square_Size, Square_Size))
 
 
-# Starting position (FEN-like layout)
+                                            # Starting position (FEN-like layout)
 if Player_number == 1:
     board =           [["BR","BN","BB","BQ","BK","BB","BN","BR"],
                       ["BP","BP","BP","BP","BP","BP","BP","BP"],
@@ -160,14 +167,14 @@ def Start():
                       ["BP","BP","BP","BP","BP","BP","BP","BP"],
                       ["BR","BN","BB","BQ","BK","BB","BN","BR"]]
 
-#Tile color
+                                            # Tile color
 def Tile_Color(ColAndRow):
     if Player_number == 1:
         return LIGHT if ColAndRow % 2 == 0 else DARK
 
     return LIGHT if ColAndRow % 2 == 1 else DARK
 
-#board
+                                            # board
 def Board(surf):
     pygame.image.load(os.path.join("pieces", "BQ.png"))
     for row in range(8):
@@ -180,20 +187,15 @@ def Board(surf):
             if piece != " ":
                 surf.blit(piece_images[piece], (col*Square_Size, row*Square_Size))
 
-#getting the coords
 def StripStringFromMove(msg: str):
-    # Expect: Move({fr_row},{fr_col})|({to_row},{to_col})
-    nums = re.findall(r"-?\d+", msg)
-    if len(nums) != 4:
-        print("Bad Move message:", msg)
-        return None, None
-    fr = (int(nums[0]), int(nums[1]))
-    to = (int(nums[2]), int(nums[3]))
-    return fr, to
+                                            # Expect: "Move:(row,col)|(row,col)"
+    move = msg[5:]                          # remove the "move:" part
+    parts = move.split("|") 
+    return parts[0], parts[1]
 
+                                            # getting the coords
 def String_with_letters_to_tuple(msg: str):
-    # legacy small helper used for selected/to parsing on client
-    nums = re.findall(r"-?\d+", msg)
+    nums = re.findall(r"\d+", msg)
     if len(nums) != 2:
         print("Bad message:", msg)
         return None
@@ -205,64 +207,85 @@ Turn = True
 clock = pygame.time.Clock()
 Turn = (my_color == "W") 
 
-#game
+                                            # game
 
 while Run:
-#sending
+                                            # sending
     for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+        if event.type == pygame.QUIT:       # quit event
             Run = False
 
-        elif event.type == pygame.MOUSEBUTTONDOWN and Turn:
+        elif event.type == pygame.MOUSEBUTTONDOWN and Turn: # getting the position of the mouse click by a square
             mouse_x, mouse_y = event.pos
             col, row = mouse_x // Square_Size, mouse_y // Square_Size
 
-            if selected is None:
+            if selected is None:            # first click - select piece
                 piece = board[row][col]
-                if piece != " " and piece[0] == my_color:
+
+                if piece != " " and piece[0] == my_color: # check if the piece belongs to the player
                     selected = (row, col)
-                    if Player_number == 2:
-                        s.sendall(f"selected{7-row},{col}\n".encode())
+
+                    if Player_number == 2:  # sending selected coords as black (player 2)
+                        s.sendall(f"selected{7-row},{col}".encode())
                         print(f"Sent selection {7-row},{col}")
-                    else:
-                        s.sendall(f"selected{row},{col}\n".encode())
+
+                    else:                   # sending selected coords as white (player 1) as selected(row,col)
+                        s.sendall(f"selected{row},{col}".encode())
                         print(f"Sent selection {row},{col}")
-            else:
+
+            else:                           # second click - move piece or deselect
                 to_row, to_col = row, col
                 from_row, from_col = selected
 
-                if (to_row, to_col) == (from_row, from_col):
+                if (to_row, to_col) == (from_row, from_col): #deselect if clicked same square
                     selected = None 
-                else:
+
+                else:                       # send move as to(row,col)
                     if Player_number == 2:
-                        s.sendall(f"to{7-to_row},{to_col}\n".encode())
+                        s.sendall(f"to{7-to_row},{to_col}".encode())
                         print(f"Sent move to {7-to_row},{to_col}")
-                    else:
-                        s.sendall(f"to{to_row},{to_col}\n".encode())
+
+                    else:                   # sending move as white (player 1)
+                        s.sendall(f"to{to_row},{to_col}".encode())
                         print(f"Sent move to {to_row},{to_col}")
+
                     selected = None
                     Turn = False
 
-#reciving
+                                            # reciving
     while not messages.empty():
+        print("P")
         msg = messages.get()
         print("Received message:", msg)
-        if msg.startswith("Move"):
-            fr_coords, to_coords = StripStringFromMove(msg)
-            fr = fr_coords
-            tr = to_coords
-            if Player_number == 2:
-                piece = board[7-fr[0]][fr[1]]
-                board[7-fr[0]][fr[1]] = " "
-                board[7-to_coords[0]][to_coords[1]] = piece
-            else:
-                piece = board[fr[0]][fr[1]]
-                board[fr[0]][fr[1]] = " "
-                board[to_coords[0]][to_coords[1]] = piece
-            fr, tr = None, None
-            if Turn == False: Turn = True
-            else: Turn = False
-            print("Partner moved to", tr)
+        print("p2")
+        if msg.startswith("move:"):         # removing "Move:" and splitting to select and to
+            print(msg)
+            selected_coords_String, to_coords_String = StripStringFromMove(msg)
+            print(selected_coords_String)
+            print(to_coords_String)
+
+            coords = (int(selected_coords_String[0]),int(selected_coords_String[2])) # getting selected coords
+            print(coords)
+            if coords:
+                remote_selected = coords
+                print("Partner selected", coords)
+
+            to_coords = (int(to_coords_String[0]),int(to_coords_String[2])) #getting to coords
+            print(to_coords)
+            if to_coords and remote_selected is not None:
+                fr = remote_selected
+                tr = to_coords
+                if Player_number == 2:      # sending the move as black (player 2)
+                    piece = board[7-fr[0]][fr[1]]
+                    board[7-fr[0]][fr[1]] = " "
+                    board[7-to_coords[0]][to_coords[1]] = piece
+                else:
+                    piece = board[fr[0]][fr[1]] # sending the move as white (player 1)
+                    board[fr[0]][fr[1]] = " "
+                    board[to_coords[0]][to_coords[1]] = piece
+                remote_selected = None
+                Turn = True  
+                print("Partner moved to", tr)
         
 
     
