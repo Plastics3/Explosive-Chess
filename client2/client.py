@@ -58,6 +58,43 @@ font = pygame.font.SysFont("Arial", 48, bold=True)
 small_font = pygame.font.SysFont("Arial", 32)
 clock = pygame.time.Clock()
 start_time = time.time()
+
+def ask_for_name(screen):
+    font = pygame.font.SysFont("Arial", 50)
+    input_box = pygame.Rect(WIDTH//2 - 200, HEIGHT//2 - 40, 400, 60)
+    user_text = ""
+    active = True
+
+    while active:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    return user_text if user_text != "" else "Player"
+                elif event.key == pygame.K_BACKSPACE:
+                    user_text = user_text[:-1]
+                else:
+                    if len(user_text) < 20:
+                        user_text += event.unicode
+
+        screen.fill((20, 20, 20))
+
+        # Draw prompt
+        text = font.render("Enter your name:", True, (255,255,255))
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2 - 120))
+
+        # Draw input box
+        pygame.draw.rect(screen, (255,255,255), input_box, 3)
+
+        name_surface = font.render(user_text, True, (255,255,255))
+        screen.blit(name_surface, (input_box.x + 10, input_box.y + 10))
+
+        pygame.display.flip()
+        clock.tick(60)
+
                                             # waiting screen look
 def draw_gradient_background():
                                             # vertical gradient
@@ -69,6 +106,7 @@ def draw_gradient_background():
         pygame.draw.line(screen, (int(r), int(g), int(b)), (0, y), (WIDTH, y))
 
 def draw_loading_circles(elapsed):
+    ask_for_name(screen)
                                             # Animate circles in a circular orbit
     num_circles = 8
     radius = 100
