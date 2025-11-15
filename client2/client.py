@@ -147,25 +147,6 @@ else:
                       ["BP","BP","BP","BP","BP","BP","BP","BP"],
                       ["BR","BN","BB","BQ","BK","BB","BN","BR"]]
 
-def Start():
-    if Player_number == 1:
-        board =       [["BR","BN","BB","BQ","BK","BB","BN","BR"],
-                      ["BP","BP","BP","BP","BP","BP","BP","BP"],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      ["WP","WP","WP","WP","WP","WP","WP","WP"],
-                      ["WR","WN","WB","WQ","WK","WB","WN","WR"]]
-    else:
-        board =       [["WR","WN","WB","WQ","WK","WB","WN","WR"],
-                      ["WP","WP","WP","WP","WP","WP","WP","WP"],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      ["BP","BP","BP","BP","BP","BP","BP","BP"],
-                      ["BR","BN","BB","BQ","BK","BB","BN","BR"]]
 
                                             # Tile color
 def Tile_Color(ColAndRow):
@@ -187,6 +168,94 @@ def Board(surf):
             if piece != " ":
                 surf.blit(piece_images[piece], (col*Square_Size, row*Square_Size))
 
+def IsValidMove(selected, to, board):
+    sel_row, sel_col = selected[0], selected[1]
+    to_row, to_col = to[0], to[1]
+    piece = board[sel_row][sel_col]
+    endPiece = board[to_row][to_col]
+
+    if piece == " ":
+        return False
+    
+    if piece[0] == endPiece[0]:
+        return False
+    
+    if piece[1] == "P":  #pawn movement
+        direction = -1 if piece[0] == "W" else 1
+        start_row = 6 if piece[0] == "W" else 1
+        if Player_number == 2:
+            direction = -direction
+            start_row = 7 - start_row
+
+        if sel_col == to_col:
+            if endPiece != " ":
+                return False
+            if to_row - sel_row == direction:
+                return True
+            if sel_row == start_row and to_row - sel_row == 2 * direction:
+                between_row = sel_row + direction
+                if board[between_row][sel_col] == " " and endPiece == " ":
+                    return True
+        elif abs(sel_col - to_col) == 1 and to_row - sel_row == direction:
+            if endPiece != " ":
+                return True
+        return False
+    
+    if piece[1] == "R":  #rook movement
+        if sel_row != to_row and sel_col != to_col:
+            return False
+        step_row = 0 if sel_row == to_row else (1 if to_row > sel_row else -1)
+        step_col = 0 if sel_col == to_col else (1 if to_col > sel_col else -1)
+        curr_row, curr_col = sel_row + step_row, sel_col + step_col
+        while (curr_row != to_row or curr_col != to_col):
+            if board[curr_row][curr_col] != " ":
+                return False
+            curr_row += step_row
+            curr_col += step_col
+        return True
+    
+    if piece[1] == "K":  #king movement
+        if abs(sel_row - to_row) <= 1 and abs(sel_col - to_col) <= 1:
+            return True
+        return False
+    
+    if piece[1] == "B":  #bishop movement
+        if abs(sel_row - to_row) != abs(sel_col - to_col):
+            return False
+        step_row = 1 if to_row > sel_row else -1
+        step_col = 1 if to_col > sel_col else -1
+        curr_row, curr_col = sel_row + step_row, sel_col + step_col
+        while (curr_row != to_row and curr_col != to_col):
+            if board[curr_row][curr_col] != " ":
+                return False
+            curr_row += step_row
+            curr_col += step_col
+        return True
+    
+    if piece[1] == "Q":  #queen movement
+        if sel_row == to_row or sel_col == to_col:
+            step_row = 0 if sel_row == to_row else (1 if to_row > sel_row else -1)
+            step_col = 0 if sel_col == to_col else (1 if to_col > sel_col else -1)
+        elif abs(sel_row - to_row) == abs(sel_col - to_col):
+            step_row = 1 if to_row > sel_row else -1
+            step_col = 1 if to_col > sel_col else -1
+        else:
+            return False
+        curr_row, curr_col = sel_row + step_row, sel_col + step_col
+        while (curr_row != to_row or curr_col != to_col):
+            if board[curr_row][curr_col] != " ":
+                return False
+            curr_row += step_row
+            curr_col += step_col
+        return True
+    
+    if piece[1] == "N":  #knight movement
+        if (abs(sel_row - to_row) == 2 and abs(sel_col - to_col) == 1) or (abs(sel_row - to_row) == 1 and abs(sel_col - to_col) == 2):
+            return True
+        return False
+    
+    return True
+
 def StripStringFromMove(msg: str):
                                             # Expect: "move:row,col|row,col"
     move = msg[5:]                          # remove the "move:" part
@@ -202,10 +271,9 @@ def String_with_letters_to_tuple(msg: str):
     return int(nums[0]), int(nums[1])
 
 my_color = "W" if Player_number == 1 else "B"
-mouse_x, mouse_y = 0,0        
-Turn = True
+mouse_x, mouse_y = 0,0    
+Turn = True if my_color == "W" else False
 clock = pygame.time.Clock()
-Turn = (my_color == "W") 
 
                                             # game
 
@@ -215,51 +283,56 @@ while Run:
         if event.type == pygame.QUIT:       # quit event
             Run = False
 
-        elif event.type == pygame.MOUSEBUTTONDOWN and Turn: # getting the position of the mouse click by a square
-            mouse_x, mouse_y = event.pos
-            col, row = mouse_x // Square_Size, mouse_y // Square_Size
+        elif event.type == pygame.MOUSEBUTTONDOWN: # getting the position of the mouse click by a square
+                mouse_x, mouse_y = event.pos
+                col, row = mouse_x // Square_Size, mouse_y // Square_Size
 
-            if selected is None:            # first click - select piece
-                piece = board[row][col]
+                if selected is None:            # first click - select piece
+                    piece = board[row][col]
 
-                if piece != " " and piece[0] == my_color: # check if the piece belongs to the player
-                    selected = (row, col)
+                    if piece != " " and piece[0] == my_color: # check if the piece belongs to the player
+                        selected = (row, col)
 
-                    if Player_number == 2:  # sending selected coords as black (player 2)
-                        s.sendall(f"selected{7-row},{col}".encode())
-                        print(f"Sent selection {7-row},{col}")
+                        if Player_number == 2:  # sending selected coords as black (player 2)
+                            s.sendall(f"selected{7-row},{col}".encode())
+                            print(f"Sent selection {7-row},{col}")
 
-                    else:                   # sending selected coords as white (player 1) as selected(row,col)
-                        s.sendall(f"selected{row},{col}".encode())
-                        print(f"Sent selection {row},{col}")
+                        else:                   # sending selected coords as white (player 1) as selected(row,col)
+                            s.sendall(f"selected{row},{col}".encode())
+                            print(f"Sent selection {row},{col}")
+                    
+                    else:
+                        selected = None
 
-            else:                           # second click - move piece or deselect
-                to_row, to_col = row, col
-                from_row, from_col = selected
+                elif selected != None and IsValidMove(selected, (row,col), board):                           # second click - move piece or deselect
+                    to_row, to_col = row, col
+                    from_row, from_col = selected
 
-                if (to_row, to_col) == (from_row, from_col): #deselect if clicked same square
-                    selected = None 
+                    if (to_row, to_col) == (from_row, from_col): #deselect if clicked same square
+                        selected = None 
 
-                else:                       # send move as to(row,col)
-                    if Player_number == 2:
-                        s.sendall(f"to{7-to_row},{to_col}".encode())
-                        print(f"Sent move to {7-to_row},{to_col}")
+                    else:                       # send move as to(row,col)
+                        Turn = False
+                        if Player_number == 2:
+                            s.sendall(f"to{7-to_row},{to_col}".encode())
+                            print(f"Sent move to {7-to_row},{to_col}")
 
-                    else:                   # sending move as white (player 1)
-                        s.sendall(f"to{to_row},{to_col}".encode())
-                        print(f"Sent move to {to_row},{to_col}")
+                        else:                   # sending move as white (player 1)
+                            s.sendall(f"to{to_row},{to_col}".encode())
+                            print(f"Sent move to {to_row},{to_col}")
+                        selected = None
+                        Turn = False
 
+                else:
                     selected = None
-                    Turn = False
+                    
 
                                             # reciving
     while not messages.empty():
-        print("P")
+        
         msg = messages.get()
         print("Received message:", msg)
-        print("p2")
         if msg.startswith("move:"):         # removing "move:" and splitting to select and to
-            print(msg)
             selected_coords_String, to_coords_String = StripStringFromMove(msg)
             print(selected_coords_String)
             print(to_coords_String)
@@ -275,19 +348,19 @@ while Run:
             if to_coords and remote_selected is not None:
                 fr = remote_selected
                 tr = to_coords
-                if Player_number == 2:      # sending the move as black (player 2)
+                if Player_number == 2:      # making the move as black (player 2)
                     piece = board[7-fr[0]][fr[1]]
                     board[7-fr[0]][fr[1]] = " "
                     board[7-to_coords[0]][to_coords[1]] = piece
                 else:
-                    piece = board[fr[0]][fr[1]] # sending the move as white (player 1)
+                    piece = board[fr[0]][fr[1]] # making the move as white (player 1)
                     board[fr[0]][fr[1]] = " "
                     board[to_coords[0]][to_coords[1]] = piece
                 remote_selected = None
-                Turn = True  
+                Turn = not Turn
+                print("Current Turn:", Turn)
                 print("Partner moved to", tr)
         
-
     
     Board(screen)
     pygame.display.flip()
