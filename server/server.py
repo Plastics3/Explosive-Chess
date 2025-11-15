@@ -23,13 +23,32 @@ def GameLogAppend(GameLog, selected, to, turn, MoveNumber):
     GameLog.append(f"Move by white number {math.ceil(float(MoveNumber/2))} ({Move})")
     return GameLog
 
+def Explotion(to, board):
+    print("Explotion at:", to)
+    Strip_To = to[2:]
+    to_row, to_col = int(to[0]), int(to[2])
+    for r in range(to_row - 1, to_row + 2):
+        for c in range(to_col - 1, to_col + 2):
+            if board[r][c] != " ":
+                if 0 <= r and r < 8 and 0 <= c and c < 8 and board[r][c][1] != "P":
+                    board[r][c] = " "
+
+    return board
+
 def BoardAfterMove(selected, to, board):
     selected, to = StripSelectedAndTo(selected, to)
     sel_row, sel_col = int(selected[0]), int(selected[2])
     to_row, to_col = int(to[0]), int(to[2])
-    piece = board[sel_row][sel_col]
-    board[to_row][to_col] = piece
-    board[sel_row][sel_col] = " "
+    if board[to_row][to_col] == " ":
+        piece = board[sel_row][sel_col]
+        board[to_row][to_col] = piece
+        board[sel_row][sel_col] = " "
+
+    else:
+        board[to_row][to_col] = " "
+        board[sel_row][sel_col] = " "
+        board = Explotion(to, board)
+    
     return board
 
 def EndGame(board):
@@ -192,6 +211,7 @@ def handle_pair(client1, client2, num):
                         turn = 3 - turn  #switch turn
 
                         end_message = EndGame(board)
+                        print("End message:", end_message)
                         if end_message != "":
                             for c in dsts:
                                 try:
@@ -202,6 +222,14 @@ def handle_pair(client1, client2, num):
 
                     selected = None
                     to = None
+
+                elif data.decode().startswith("Black wins!") or data.decode().startswith("White wins!"):
+                    for c in dsts:
+                        try:
+                            c.sendall(f"{data.decode()}\n".encode())
+                        except OSError:
+                            pass
+                    return
 
 
 

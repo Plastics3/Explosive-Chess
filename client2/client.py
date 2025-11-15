@@ -18,6 +18,31 @@ small_font = pygame.font.SysFont("Arial", 32)
 clock = pygame.time.Clock()
 start_time = time.time()
 
+class Button:
+    def __init__(self, x, y, w, h, text, font, bg_color, hover_color, text_color):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.text = text
+        self.font = font
+        self.bg_color = bg_color
+        self.hover_color = hover_color
+        self.text_color = text_color
+
+    def draw(self, screen):
+        mouse = pygame.mouse.get_pos()
+        color = self.hover_color if self.rect.collidepoint(mouse) else self.bg_color
+
+        pygame.draw.rect(screen, color, self.rect, border_radius=8)
+
+        txt = self.font.render(self.text, True, self.text_color)
+        txt_rect = txt.get_rect(center=self.rect.center)
+        screen.blit(txt, txt_rect)
+
+    def clicked(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+
 def ask_for_name(screen):                   # your name input screen
     font = pygame.font.SysFont("Arial", 50)
     input_box = pygame.Rect(WIDTH//2 - 200, HEIGHT//2 - 40, 400, 60)
@@ -49,7 +74,7 @@ def ask_for_name(screen):                   # your name input screen
         pygame.draw.rect(screen, (255,255,255), input_box, 3)
 
         name_surface = font.render(user_text, True, (255,255,255))
-        screen.blit(name_surface, (input_box.x + 10, input_box.y + 10))
+        screen.blit(name_surface, (input_box.x + 10, input_box.y ))
 
         pygame.display.flip()
         clock.tick(60)
@@ -60,6 +85,19 @@ lock = threading.Lock()
 messages = queue.Queue()
 start = False
 board = []
+
+font_small = pygame.font.SysFont(None, 30)
+
+resign_button = Button(
+    x=160*7 + 40, y=0,
+    w=120, h=40,
+    text="Resign",
+    font=font_small,
+    bg_color=(180, 50, 50),
+    hover_color=(220, 80, 80),
+    text_color=(255, 255, 255)
+)
+
                                             # messages
 def listen_for_messages(sock):
     buffer = ""
@@ -214,6 +252,51 @@ def Board(surf):
             piece = board[row][col]
             if piece != " ":
                 surf.blit(piece_images[piece], (col*Square_Size, row*Square_Size))
+
+def EndGame(board):
+    white_king = False
+    black_king = False
+    for row in board:
+        for piece in row:
+            if piece == "WK":
+                white_king = True
+            elif piece == "BK":
+                black_king = True
+    if not white_king:
+        return "Black wins!"
+    if not black_king:
+        return "White wins!"
+    return ""
+
+def Explotion(to, board):
+    """Remove non-pawn pieces in the 3x3 area centered at `to` (row,col)."""
+    print("Explosion at:", to)
+    to_row, to_col = to[0], to[1]
+    for r in range(to_row - 1, to_row + 2):
+        for c in range(to_col - 1, to_col + 2):
+            # check bounds first
+            if 0 <= r < 8 and 0 <= c < 8:
+                piece = board[r][c]
+                # remove if tile not empty and not a pawn
+                if piece != " " and len(piece) >= 2 and piece[1] != "P":
+                    board[r][c] = " "
+
+    center_x = to_col * Square_Size + Square_Size // 2
+    center_y = to_row * Square_Size + Square_Size // 2
+    for i in range(6):
+        # redraw board and pieces (simple)
+        Board(screen)
+        # draw expanding translucent circle
+        radius = 10 + i * 20
+        surf = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
+        alpha = max(0, 180 - i*30)
+        pygame.draw.circle(surf, (255, 80, 60, alpha), (radius, radius), radius)
+        screen.blit(surf, (center_x - radius, center_y - radius))
+        # redraw UI elements that should remain visible
+        draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_color)
+        resign_button.draw(screen)
+        pygame.display.flip()
+        pygame.time.delay(40)
 
 def IsValidMove(selected, to, board):
     sel_row, sel_col = selected[0], selected[1]
@@ -463,6 +546,9 @@ while Run:
         if event.type == pygame.QUIT:       # quit event
             Run = False
 
+        elif resign_button.clicked(event):
+            s.sendall(f"{'Black wins!' if my_color == 'W' else 'White wins!'}".encode())
+
         elif event.type == pygame.MOUSEBUTTONDOWN: # getting the position of the mouse click by a square
                 mouse_x, mouse_y = event.pos
                 col, row = mouse_x // Square_Size, mouse_y // Square_Size
@@ -528,18 +614,38 @@ while Run:
             if to_coords and remote_selected is not None:
                 fr = remote_selected
                 tr = to_coords
-                if Player_number == 2:      # making the move as black (player 2)
-                    piece = board[7-fr[0]][fr[1]]
-                    board[7-fr[0]][fr[1]] = " "
-                    board[7-to_coords[0]][to_coords[1]] = piece
+
+                if Player_number == 2:
+                    # For player 2 the board indexing is flipped vertically in your code.
+                    src_r, src_c = 7 - fr[0], fr[1]
+                    dst_r, dst_c = 7 - to_coords[0], to_coords[1]
                 else:
-                    piece = board[fr[0]][fr[1]] # making the move as white (player 1)
-                    board[fr[0]][fr[1]] = " "
-                    board[to_coords[0]][to_coords[1]] = piece
+                    # Player 1 uses direct indexing
+                    src_r, src_c = fr[0], fr[1]
+                    dst_r, dst_c = to_coords[0], to_coords[1]
+
+                # read destination piece BEFORE we overwrite it
+                endPiece = board[dst_r][dst_c]
+
+                # move piece
+                piece = board[src_r][src_c]
+                board[src_r][src_c] = " "
+                board[dst_r][dst_c] = piece
+
+                # If destination had a piece -> capture happened -> explode centered on that destination square
+                if endPiece != " ":
+                    board[dst_r][dst_c] = " "  # remove captured piece before explosion
+                    Explotion((dst_r, dst_c), board)
+
+                IsEnded = EndGame(board)
+                if IsEnded != "":
+                    game_over(screen, board, IsEnded)
+
                 remote_selected = None
                 Turn = not Turn
                 print("Current Turn:", Turn)
                 print("Partner moved to", tr)
+
 
         elif msg.startswith("Black wins!") or msg.startswith("White wins!"):
             GameOverOrReturn = game_over(screen, board, msg)
@@ -554,10 +660,17 @@ while Run:
     now = time.time()
     delta = now - last_tick
 
-    if Turn and my_color == "W":
-        white_time -= delta
-    elif Turn and my_color == "B":
-        black_time -= delta
+    if Turn:
+        if my_color == "W":
+            white_time -= delta
+        else:
+            black_time -= delta
+
+    else:
+        if my_color == "W":
+            black_time -= delta
+        else:
+            white_time -= delta
 
     last_tick = now
 
@@ -573,6 +686,7 @@ while Run:
     
     Board(screen)
     draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_color)
+    resign_button.draw(screen)
     pygame.display.flip()
     clock.tick(60)
 
