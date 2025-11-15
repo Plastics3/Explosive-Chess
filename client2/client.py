@@ -6,51 +6,10 @@ import queue
 
 HOST = "127.0.0.1"  
 PORT = 65432
-    
-lock = threading.Lock()
-messages = queue.Queue()
-start = False
-board = []
-                                            # messages
-def listen_for_messages(sock):
-    buffer = ""
+                                            
+pygame.init()                               # screen setup
 
-    while True:
-        try:
-            data = sock.recv(1024)
-            if not data:                        
-                print("Disconnected from server")
-                break
-
-            buffer += data.decode()
-
-            while "\n" in buffer:
-                msg, buffer = buffer.split("\n", 1)
-                messages.put(msg)
-
-        except:
-            break
-
-                                            # connecting to server
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
-print("Connected to server, waiting for partner...")
-
-                                            # Start listener thread
-threading.Thread(target=listen_for_messages, args=(s,), daemon=True).start()
-
-                                            # colors
-LIGHT = (240, 217, 181)
-DARK  = (181, 136, 99)
-BG_TOP = (30, 30, 60)
-BG_BOTTOM = (10, 10, 30)
-TEXT_COLOR = (255, 255, 255)
-CIRCLE_COLOR = (100, 200, 255)
-
-                                            # waiting screen
-pygame.init()
-
-Square_Size = 160
+Square_Size = 160                           # all of the measurements
 Row, Col = 8, 8
 WIDTH, HEIGHT = Square_Size * Col, Square_Size * Row
 screen = pygame.display.set_mode((WIDTH,HEIGHT))
@@ -59,7 +18,7 @@ small_font = pygame.font.SysFont("Arial", 32)
 clock = pygame.time.Clock()
 start_time = time.time()
 
-def ask_for_name(screen):
+def ask_for_name(screen):                   # your name input screen
     font = pygame.font.SysFont("Arial", 50)
     input_box = pygame.Rect(WIDTH//2 - 200, HEIGHT//2 - 40, 400, 60)
     user_text = ""
@@ -95,6 +54,51 @@ def ask_for_name(screen):
         pygame.display.flip()
         clock.tick(60)
 
+my_name = ask_for_name(screen)               # get player name
+
+lock = threading.Lock()
+messages = queue.Queue()
+start = False
+board = []
+                                            # messages
+def listen_for_messages(sock):
+    buffer = ""
+
+    while True:
+        try:
+            data = sock.recv(1024)
+            if not data:                        
+                print("Disconnected from server")
+                break
+
+            buffer += data.decode()
+
+            while "\n" in buffer:
+                msg, buffer = buffer.split("\n", 1)
+                messages.put(msg)
+
+        except:
+            break
+
+                                            # connecting to server
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.connect((HOST, PORT))
+print("Connected to server, waiting for partner...")
+
+                                            # Start listener thread
+threading.Thread(target=listen_for_messages, args=(s,), daemon=True).start()
+s.sendall(f"name:{my_name}\n".encode())
+
+                                            # colors
+LIGHT = (240, 217, 181)
+DARK  = (181, 136, 99)
+BG_TOP = (30, 30, 60)
+BG_BOTTOM = (10, 10, 30)
+TEXT_COLOR = (255, 255, 255)
+CIRCLE_COLOR = (100, 200, 255)
+
+                                            # waiting screen
+
                                             # waiting screen look
 def draw_gradient_background():
                                             # vertical gradient
@@ -105,8 +109,9 @@ def draw_gradient_background():
         b = BG_TOP[2] * (1 - ratio) + BG_BOTTOM[2] * ratio
         pygame.draw.line(screen, (int(r), int(g), int(b)), (0, y), (WIDTH, y))
 
+
+
 def draw_loading_circles(elapsed):
-    ask_for_name(screen)
                                             # Animate circles in a circular orbit
     num_circles = 8
     radius = 100
@@ -373,6 +378,11 @@ my_color = "W" if Player_number == 1 else "B"
 mouse_x, mouse_y = 0,0    
 Turn = True if my_color == "W" else False
 clock = pygame.time.Clock()
+white_time = 5 * 60     # 5 minutes
+black_time = 5 * 60
+last_tick = time.time()
+opponent_name = "Opponent"
+
 
 def matchmaking():
     global s, messages, start, Player_number, board, my_color, Turn, selected, start_time
@@ -389,6 +399,7 @@ def matchmaking():
     print("Reconnected to server, waiting for partner...")
 
     threading.Thread(target=listen_for_messages, args=(s,), daemon=True).start()
+    s.sendall(f"name:{my_name}\n".encode())
 
     # show same waiting screen you already have
     while start == False:
@@ -429,6 +440,23 @@ def matchmaking():
     Turn = True if my_color == "W" else False
                                             # game
 
+def draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_color):
+    font = pygame.font.SysFont("Arial", 40)
+
+    # Format time
+    def fmt(t):
+        m = int(t) // 60
+        s = int(t) % 60
+        return f"{m:02d}:{s:02d}"
+
+    # White info top-left
+    white_text = font.render(f"{opponent_name if my_color=='B' else my_name}  •  {fmt(white_time)}", True, (200,200,200))
+    screen.blit(white_text, (20, 20))
+
+    # Black info top-right
+    black_text = font.render(f"{my_name if my_color=='B' else opponent_name}  •  {fmt(black_time)}", True, (200,200,200))
+    screen.blit(black_text, (20, HEIGHT - 60))
+
 while Run:
                                             # sending
     for event in pygame.event.get():
@@ -456,7 +484,7 @@ while Run:
                     else:
                         selected = None
 
-                elif selected != None and IsValidMove(selected, (row,col), board):                           # second click - move piece or deselect
+                elif selected != None and IsValidMove(selected, (row,col), board):  # second click - move piece or deselect
                     to_row, to_col = row, col
                     from_row, from_col = selected
 
@@ -520,8 +548,31 @@ while Run:
             elif GameOverOrReturn == "matchmaking":
                 # Reset game state for matchmaking
                 matchmaking()
+
+        elif msg.startswith("name:"):
+            opponent_name = msg[5:]
+    now = time.time()
+    delta = now - last_tick
+
+    if Turn and my_color == "W":
+        white_time -= delta
+    elif Turn and my_color == "B":
+        black_time -= delta
+
+    last_tick = now
+
+    # clamp to 0
+    white_time = max(0, white_time)
+    black_time = max(0, black_time)
+
+    # detect time over
+    if white_time <= 0:
+        game_over(screen, board, "Black wins (White timed out)")
+    elif black_time <= 0:
+        game_over(screen, board, "White wins (Black timed out)")
     
     Board(screen)
+    draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_color)
     pygame.display.flip()
     clock.tick(60)
 
