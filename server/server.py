@@ -1,6 +1,7 @@
 import socket
 import threading
 import random
+import math
 
 HOST = "127.0.0.1"
 PORT = 65432
@@ -13,6 +14,15 @@ def StripSelectedAndTo(selected, to):
     Strip_To = to[2:]              #removing "to:"
     return Strip_Selected, Strip_To
 
+def GameLogAppend(GameLog, selected, to, turn, MoveNumber):
+    selected, to = StripSelectedAndTo(selected, to)
+    sel_row, sel_col = int(selected[0]), int(selected[2])
+    to_row, to_col = int(to[0]), int(to[2])
+    ReverseMove = ((7-sel_row, sel_col), (7-to_row, to_col))
+    Move = (selected, to) if turn == 1 else ReverseMove
+    GameLog.append(f"Move by white number {math.ceil(float(MoveNumber/2))} ({Move})")
+    return GameLog
+
 def BoardAfterMove(selected, to, board):
     selected, to = StripSelectedAndTo(selected, to)
     sel_row, sel_col = int(selected[0]), int(selected[2])
@@ -21,6 +31,21 @@ def BoardAfterMove(selected, to, board):
     board[to_row][to_col] = piece
     board[sel_row][sel_col] = " "
     return board
+
+def EndGame(board):
+    white_king = False
+    black_king = False
+    for row in board:
+        for piece in row:
+            if piece == "WK":
+                white_king = True
+            elif piece == "BK":
+                black_king = True
+    if not white_king:
+        return "Black wins!"
+    if not black_king:
+        return "White wins!"
+    return ""
 
 def IsValidMove(selected, to, board, turn):
     selected, to = StripSelectedAndTo(selected, to)
@@ -139,9 +164,11 @@ def handle_pair(client1, client2, num):
     selected = None
     to = None
     turn = 1        # #1 for white, #2 for black
+    GameLog = []
+    MoveNumber = 1
 
     def forward(src, dsts):
-        nonlocal board, turn, selected, to
+        nonlocal board, turn, selected, to, GameLog, MoveNumber
         try:
             while True:
                 data = src.recv(1024)
@@ -156,14 +183,22 @@ def handle_pair(client1, client2, num):
 
                 elif data.decode().startswith("to"):
                     to = data.decode() #Get to coordinates and then send it 
-                    print(IsValidMove(selected, to, board, turn))
+                    MoveNumber += 1
+                    GameLog = GameLogAppend(GameLog, selected, to, turn, MoveNumber) # update the Game log
+
                     if IsValidMove(selected, to, board, turn):
-                    
                         SendMassageToClients(clients, selected, to)
-                        print(board)
                         board = BoardAfterMove(selected, to, board)
-                        print(board)
                         turn = 3 - turn  #switch turn
+
+                        end_message = EndGame(board)
+                        if end_message != "":
+                            for c in dsts:
+                                try:
+                                    c.sendall(f"{end_message}\n".encode())
+                                except OSError:
+                                    pass
+                            return
 
                     selected = None
                     to = None

@@ -10,7 +10,7 @@ PORT = 65432
 lock = threading.Lock()
 messages = queue.Queue()
 start = False
-
+board = []
                                             # messages
 def listen_for_messages(sock):
     buffer = ""
@@ -128,24 +128,28 @@ for key in piece_images:
 
 
                                             # Starting position (FEN-like layout)
-if Player_number == 1:
-    board =           [["BR","BN","BB","BQ","BK","BB","BN","BR"],
-                      ["BP","BP","BP","BP","BP","BP","BP","BP"],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      ["WP","WP","WP","WP","WP","WP","WP","WP"],
-                      ["WR","WN","WB","WQ","WK","WB","WN","WR"]]
-else:
-    board =           [["WR","WN","WB","WQ","WK","WB","WN","WR"],
-                      ["WP","WP","WP","WP","WP","WP","WP","WP"],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      [" "," "," "," "," "," "," "," "],
-                      ["BP","BP","BP","BP","BP","BP","BP","BP"],
-                      ["BR","BN","BB","BQ","BK","BB","BN","BR"]]
+def StartBoard():
+    
+    if Player_number == 1:
+        board =           [["BR","BN","BB","BQ","BK","BB","BN","BR"],
+                        ["BP","BP","BP","BP","BP","BP","BP","BP"],
+                        [" "," "," "," "," "," "," "," "],
+                        [" "," "," "," "," "," "," "," "],
+                        [" "," "," "," "," "," "," "," "],
+                        [" "," "," "," "," "," "," "," "],
+                        ["WP","WP","WP","WP","WP","WP","WP","WP"],
+                        ["WR","WN","WB","WQ","WK","WB","WN","WR"]]
+    else:
+        board =           [["WR","WN","WB","WQ","WK","WB","WN","WR"],
+                        ["WP","WP","WP","WP","WP","WP","WP","WP"],
+                        [" "," "," "," "," "," "," "," "],
+                        [" "," "," "," "," "," "," "," "],
+                        [" "," "," "," "," "," "," "," "],
+                        [" "," "," "," "," "," "," "," "],
+                        ["BP","BP","BP","BP","BP","BP","BP","BP"],
+                        ["BR","BN","BB","BQ","BK","BB","BN","BR"]]
+    return board
+board = StartBoard()
 
 
                                             # Tile color
@@ -256,6 +260,63 @@ def IsValidMove(selected, to, board):
     
     return True
 
+def game_over(screen, board, winner):
+    """Displays the final board and allows player to return to matchmaking or exit."""
+
+    font_big = pygame.font.SysFont("Arial", 90, bold=True)
+    font_mid = pygame.font.SysFont("Arial", 50, bold=True)
+
+    # Draw final board
+    Board(screen)
+
+    # Winner text
+    msg = winner if winner != "Draw" else "It's a Draw!"
+    text_surface = font_big.render(msg, True, (255, 215, 0))
+    text_rect = text_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 200))
+
+    # Overlay
+    overlay = pygame.Surface((WIDTH, HEIGHT))
+    overlay.set_alpha(170)
+    overlay.fill((0, 0, 0))
+    screen.blit(overlay, (0, 0))
+
+    # Draw text
+    screen.blit(text_surface, text_rect)
+
+    # --- Buttons ---
+    play_text = font_mid.render("Play Again", True, (255, 255, 255))
+    exit_text = font_mid.render("Exit Game", True, (255, 255, 255))
+
+    play_rect = play_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
+    exit_rect = exit_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 120))
+
+    pygame.draw.rect(screen, (50, 150, 50), play_rect.inflate(40, 20), border_radius=20)
+    pygame.draw.rect(screen, (150, 50, 50), exit_rect.inflate(40, 20), border_radius=20)
+
+    screen.blit(play_text, play_rect)
+    screen.blit(exit_text, exit_rect)
+
+    pygame.display.flip()
+
+    # --- Wait for click ---
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "exit"
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = event.pos
+
+                if play_rect.inflate(40, 20).collidepoint(mx, my):
+                    return "matchmaking"
+
+                if exit_rect.inflate(40, 20).collidepoint(mx, my):
+                    return "exit"
+
+        pygame.time.delay(10)
+
+
+
 def StripStringFromMove(msg: str):
                                             # Expect: "move:row,col|row,col"
     move = msg[5:]                          # remove the "move:" part
@@ -275,6 +336,59 @@ mouse_x, mouse_y = 0,0
 Turn = True if my_color == "W" else False
 clock = pygame.time.Clock()
 
+def matchmaking():
+    global s, messages, start, Player_number, board, my_color, Turn, selected, start_time
+
+    # reset states
+    messages = queue.Queue()
+    start = False
+    selected = None
+    start_time = time.time()
+
+    # reconnect to server
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((HOST, PORT))
+    print("Reconnected to server, waiting for partner...")
+
+    threading.Thread(target=listen_for_messages, args=(s,), daemon=True).start()
+
+    # show same waiting screen you already have
+    while start == False:
+        elapsed = time.time() - start_time
+        draw_gradient_background()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        text_surface = font.render("Waiting for Partner...", True, TEXT_COLOR)
+        text_rect = text_surface.get_rect(center=(WIDTH//2, HEIGHT//2 - 300))
+        screen.blit(text_surface, text_rect)
+
+        draw_loading_circles(elapsed)
+
+        hint_surface = small_font.render("Please wait...", True, TEXT_COLOR)
+        hint_rect = hint_surface.get_rect(center=(WIDTH//2, HEIGHT//2 + 150))
+        screen.blit(hint_surface, hint_rect)
+
+        while not messages.empty():
+            msg = messages.get()
+
+            if msg == "start":
+                start = True
+
+            elif msg.startswith("num"):
+                Player_number = int(msg[3:])
+                print(f"Assigned as Player {Player_number}")
+
+        pygame.display.flip()
+        clock.tick(120)
+
+    # after matchmaking finishes  
+    board = StartBoard()
+    my_color = "W" if Player_number == 1 else "B"
+    Turn = True if my_color == "W" else False
                                             # game
 
 while Run:
@@ -360,7 +474,14 @@ while Run:
                 Turn = not Turn
                 print("Current Turn:", Turn)
                 print("Partner moved to", tr)
-        
+
+        elif msg.startswith("Black wins!") or msg.startswith("White wins!"):
+            GameOverOrReturn = game_over(screen, board, msg)
+            if GameOverOrReturn == "exit":
+                Run = False
+            elif GameOverOrReturn == "matchmaking":
+                # Reset game state for matchmaking
+                matchmaking()
     
     Board(screen)
     pygame.display.flip()
