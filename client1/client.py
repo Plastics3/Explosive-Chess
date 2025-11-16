@@ -125,7 +125,7 @@ print("Connected to server, waiting for partner...")
 
                                             # Start listener thread
 threading.Thread(target=listen_for_messages, args=(s,), daemon=True).start()
-s.sendall(f"name:{my_name}\n".encode())
+
 
                                             # colors
 LIGHT = (240, 217, 181)
@@ -467,6 +467,7 @@ last_tick = time.time()
 opponent_name = "Opponent"
 
 
+
 def matchmaking():
     global s, messages, start, Player_number, board, my_color, Turn, selected, start_time
 
@@ -533,12 +534,15 @@ def draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_
         return f"{m:02d}:{s:02d}"
 
     # White info top-left
-    white_text = font.render(f"{opponent_name if my_color=='B' else my_name}  •  {fmt(white_time)}", True, (200,200,200))
+    white_text = font.render(f"{opponent_name}  •  {fmt(white_time if my_color == 'B' else black_time)}", True, (200,200,200))
     screen.blit(white_text, (20, 20))
 
     # Black info top-right
-    black_text = font.render(f"{my_name if my_color=='B' else opponent_name}  •  {fmt(black_time)}", True, (200,200,200))
+    black_text = font.render(f"{my_name}  •  {fmt(white_time if my_color == 'W' else black_time)}", True, (200,200,200))
     screen.blit(black_text, (20, HEIGHT - 60))
+
+
+s.sendall(f"name:{my_name}\n".encode())
 
 while Run:
                                             # sending
@@ -639,7 +643,12 @@ while Run:
 
                 IsEnded = EndGame(board)
                 if IsEnded != "":
-                    game_over(screen, board, IsEnded)
+                    GameOverOrReturn = game_over(screen, board, IsEnded)
+                    if GameOverOrReturn == "exit":
+                        Run = False
+                    elif GameOverOrReturn == "matchmaking":
+                        # Reset game state for matchmaking
+                        matchmaking()
 
                 remote_selected = None
                 Turn = not Turn
@@ -656,7 +665,11 @@ while Run:
                 matchmaking()
 
         elif msg.startswith("name:"):
-            opponent_name = msg[5:]
+            print("Received opponent name message:", msg)
+            if msg[5:] != my_name:
+                opponent_name = msg[5:]
+                print("Opponent name set to:", opponent_name)
+
     now = time.time()
     delta = now - last_tick
 

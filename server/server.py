@@ -230,6 +230,14 @@ def handle_pair(client1, client2, num):
                         except OSError:
                             pass
                     return
+                
+                elif data.decode().startswith("name:"):
+                    for c in dsts:
+                        try:
+                            c.sendall(data)
+                        except OSError:
+                            pass
+
 
 
 
