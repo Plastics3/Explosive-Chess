@@ -559,11 +559,11 @@ def draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_
         return f"{m:02d}:{s:02d}"
 
     # White info top-left
-    white_text = font.render(f"{opponent_name}  •  {fmt(white_time if my_color == 'B' else black_time)}", True, (200,200,200))
+    white_text = font.render(f"{opponent_name}  •  {fmt(white_time if my_color == 'B' else black_time)}", True, (255, 255, 120))
     screen.blit(white_text, (20, 20))
 
     # Black info top-right
-    black_text = font.render(f"{my_name}  •  {fmt(white_time if my_color == 'W' else black_time)}", True, (200,200,200))
+    black_text = font.render(f"{my_name}  •  {fmt(white_time if my_color == 'W' else black_time)}", True, (255, 255, 120))
     screen.blit(black_text, (20, HEIGHT - 60))
 
 
