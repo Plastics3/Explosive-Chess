@@ -386,6 +386,31 @@ def IsValidMove(selected, to, board):
     
     return True
 
+def PosibleMoves(selected, board):
+    moves = []
+    sel_row, sel_col = selected[0], selected[1]
+    piece = board[sel_row][sel_col]
+
+    for row in range(8):
+        for col in range(8):
+            if IsValidMove(selected, (row, col), board) and not (sel_col == col and sel_row == row):
+                moves.append((row, col))
+    return moves
+
+def draw_possible_moves(screen, possible_squares, square_size=100, color=(0, 255, 0)):
+    """Draws highlight overlays on all squares in possible_squares.
+       possible_squares is a list of (row, col) tuples.
+    """
+    for row, col in possible_squares:
+        x = col * square_size
+        y = row * square_size
+
+        # Transparent highlight rectangle
+        highlight = pygame.Surface((square_size, square_size), pygame.SRCALPHA)
+        highlight.fill((*color, 90))   # last value = alpha transparency
+
+        screen.blit(highlight, (x, y))
+
 def game_over(screen, board, winner):
     """Displays the final board and allows player to return to matchmaking or exit."""
 
@@ -592,6 +617,8 @@ while Run:
                             print(f"Sent move to {to_row},{to_col}")
                         selected = None
                         Turn = False
+                    
+
 
                 else:
                     selected = None
@@ -698,6 +725,9 @@ while Run:
         game_over(screen, board, "White wins (Black timed out)")
     
     Board(screen)
+    if selected is not None:
+        possible_squares = PosibleMoves(selected, board)
+        draw_possible_moves(screen, possible_squares, square_size=Square_Size, color=(0, 255, 0))
     draw_player_info(screen, my_name, opponent_name, white_time, black_time, my_color)
     resign_button.draw(screen)
     pygame.display.flip()
