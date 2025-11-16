@@ -633,6 +633,7 @@ while Run:
             selected_coords_String, to_coords_String = StripStringFromMove(msg)
             print(selected_coords_String)
             print(to_coords_String)
+            Turn = not Turn
 
             coords = (int(selected_coords_String[0]),int(selected_coords_String[2])) # getting selected coords
             print(coords)
@@ -678,7 +679,7 @@ while Run:
                         matchmaking()
 
                 remote_selected = None
-                Turn = not Turn
+                
                 print("Current Turn:", Turn)
                 print("Partner moved to", tr)
 
